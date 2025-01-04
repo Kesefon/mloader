@@ -182,6 +182,15 @@ Examples:
     show_default=True,
     help="Save raw images in sub directory by chapter",
 )
+@click.option(
+    "--metadata",
+    "-m",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Embed Metadata (ComicInfo.xml)",
+    envvar="MLOADER_METADATA",
+)
 @click.argument("urls", nargs=-1, callback=validate_urls, expose_value=False)
 @click.pass_context
 def main(
@@ -195,6 +204,7 @@ def main(
     last: bool,
     chapter_title: bool,
     chapter_subdir: bool,
+    metadata: bool,
     chapters: Optional[Set[int]] = None,
     titles: Optional[Set[int]] = None,
 ):
@@ -211,6 +221,7 @@ def main(
         destination=out_dir,
         add_chapter_title=chapter_title,
         add_chapter_subdir=chapter_subdir,
+        embed_metadata=metadata,
     )
 
     loader = MangaLoader(exporter, quality, split)

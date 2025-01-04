@@ -11,8 +11,8 @@ from mloader.utils import (
     is_oneshot,
     chapter_name_to_int,
     is_windows,
+    generate_comic_info
 )
-
 
 class ExporterBase(metaclass=ABCMeta):
     def __init__(
@@ -23,6 +23,7 @@ class ExporterBase(metaclass=ABCMeta):
         next_chapter: Optional[Chapter] = None,
         add_chapter_title: bool = False,
         add_chapter_subdir: bool = False,
+        embed_metadata: bool = False,
     ):
         self.destination = destination
 
@@ -54,6 +55,9 @@ class ExporterBase(metaclass=ABCMeta):
         self.chapter_name = " ".join(
             (self._chapter_prefix, self._chapter_suffix)
         )
+        self.embed_metadata = embed_metadata
+        if embed_metadata:
+            self.comic_info = generate_comic_info(chapter.sub_title, chapter.start_timestamp,chapter_name_to_int(chapter.name),title.name,title.author,title.language, not chapter.is_vertical_only)
 
     def _is_extra(self, chapter_name: str) -> bool:
         return chapter_name.strip("#") == "ex"
@@ -116,6 +120,10 @@ class ExporterBase(metaclass=ABCMeta):
     def skip_image(self, index: Union[int, range]) -> bool:
         pass
 
+    @abstractmethod
+    def add_comic_info(self, data):
+        pass
+
 
 class RawExporter(ExporterBase):
     def __init__(self, *args, **kwargs):
@@ -125,6 +133,8 @@ class RawExporter(ExporterBase):
         if self.add_chapter_subdir:
             self.path = self.path.joinpath(self.chapter_name)
             self.path.mkdir(parents=True, exist_ok=True)
+        if self.embed_metadata:
+            self.add_comic_info(self.comic_info)
 
     def add_image(self, image_data: bytes, index: Union[int, range]):
         filename = Path(self.format_page_name(index))
@@ -133,6 +143,8 @@ class RawExporter(ExporterBase):
     def skip_image(self, index: Union[int, range]) -> bool:
         filename = Path(self.format_page_name(index))
         return self.path.joinpath(filename).exists()
+    def add_comic_info(self, data):
+        self.path.joinpath("ComicInfo.xml").write_text(data)
 
 
 class CBZExporter(ExporterBase):
@@ -146,6 +158,8 @@ class CBZExporter(ExporterBase):
             self.archive = zipfile.ZipFile(
                 self.path, mode="w", compression=compression
             )
+            if self.embed_metadata:
+                self.add_comic_info(self.comic_info)
 
     def add_image(self, image_data: bytes, index: Union[int, range]):
         if self.skip_all_images:
@@ -155,6 +169,11 @@ class CBZExporter(ExporterBase):
 
     def skip_image(self, index: Union[int, range]) -> bool:
         return self.skip_all_images
+
+    def add_comic_info(self, data):
+        if self.skip_all_images:
+            return
+        self.archive.writestr("ComicInfo.xml", data)
 
     def close(self):
         if self.skip_all_images:
